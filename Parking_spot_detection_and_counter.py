@@ -15,6 +15,11 @@ ret = True
 while True :
     ret,frame = cap.read()
 
+    # plot how the bbox is look like
+    for spot in spots:
+        x1,y1,w,h = spot
+        frame=cv2.rectangle(frame,(x1,y1),(x1 + w,y1 + h),(255,0,0),2)
+
 
     cv2.imshow('frame',frame)
     if cv2.waitKey(25) & 0xFF == ord('q'):
