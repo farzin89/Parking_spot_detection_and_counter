@@ -1,6 +1,10 @@
-
+import matplotlib.pyplot as plt
 import cv2
 from util import get_parking_spots_bboxes,empty_or_not
+import numpy as np
+def calc_diff(im1,im2):
+    return np.abs(np.mean(im1) - np.mean(im2))
+
 mask = 'mask_crop.png'
 video_path = 'parking_crop_loop.mp4'
 
@@ -12,22 +16,46 @@ connected_components = cv2.connectedComponentsWithStats(mask, 4, cv2.CV_32S)
 spots =get_parking_spots_bboxes(connected_components)
 
 spots_status = [None for j in spots]
+diffs = [None for j in spots]
+
+previous_frame = None
+
 frame_nmr = 0
 ret = True
 step = 30
 while ret :
     ret,frame = cap.read()
 
+
+
     # plot how the bbox is look like
-    if frame_nmr % step == 0:
+    # saving all the differences
+    if frame_nmr % step == 0 and previous_frame is not None:
 
          for spot_indx,spot in enumerate(spots):
+             x1, y1, w, h = spot
+             # make a crop of frame
+             spot_crop = frame[y1:y1 + h, x1:x1 + w, :]
+
+             diffs[spot_indx] = calc_diff(spot_crop,previous_frame[y1:y1 + h, x1:x1 + w, :])
+         print([diffs[j] for j in np.argsort(diffs)][::-1])
+
+    if frame_nmr % step == 0:
+        if previous_frame is None:
+            arr_ = range(len(spots))
+        else:
+            arr_ = [j for j in np.argsort(diffs) if diffs[j]/np.amax(diffs)>0.4]
+        for spot_indx in arr_:
+            spot = spots[spot_indx]
             x1,y1,w,h = spot
             # make a crop of frame
             spot_crop = frame[y1:y1 +h, x1:x1 + w,:]
             # is parking spot empty or not
             spot_status =empty_or_not(spot_crop)
             spots_status[spot_indx] = spot_status
+    if frame_nmr % step == 0:
+        previous_frame = frame.copy()
+
     for spot_indx, spot in enumerate(spots):
         spot_status =spots_status[spot_indx]
         x1,y1,w,h = spots[spot_indx]
@@ -36,7 +64,7 @@ while ret :
         else:
             frame = cv2.rectangle(frame, (x1, y1), (x1 + w, y1 + h), (0, 0,255), 2)
 
-
+    cv2.namedWindow('frame',cv2.WINDOW_NORMAL)
     cv2.imshow('frame',frame)
     if cv2.waitKey(25) & 0xFF == ord('q'):
         break
